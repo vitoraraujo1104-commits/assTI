@@ -11,8 +11,9 @@ from PySide6.QtGui import QIcon, QDesktopServices, QColor, QFont, QPixmap
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QFrame, QLabel,
     QPushButton, QVBoxLayout, QHBoxLayout, QStackedWidget, QTableWidget,
     QTableWidgetItem, QHeaderView, QAbstractItemView, QFileDialog, QMessageBox,
-    QProgressBar, QSpinBox, QPlainTextEdit)
+    QProgressBar, QSpinBox, QPlainTextEdit, QTabWidget)
 from core import read_invoice, export_invoices, brl
+from pdf_ui import PDFTab
 
 VERSION = '2.0.0'
 ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
@@ -113,7 +114,7 @@ class Worker(QThread):
 class MainWindow(QMainWindow):
     def __init__(self, data_dir=None):
         super().__init__()
-        self.setWindowTitle('AssTI — Extrator de faturas XML')
+        self.setWindowTitle('AssTI 2.0 — Extratores PDF e XML')
         self.setWindowIcon(QIcon(str(ROOT / 'assets' / 'assti.ico')))
         self.resize(1280, 850)
         self.setMinimumSize(1000, 710)
@@ -157,6 +158,13 @@ class MainWindow(QMainWindow):
         self.make_settings()
         self.switch_page(0)
         self.refresh()
+        # Mantém toda a interface XML original dentro da segunda aba.
+        xml_shell = self.takeCentralWidget()
+        self.tabs = QTabWidget()
+        self.pdf_tab = PDFTab()
+        self.tabs.addTab(self.pdf_tab, 'Extrator de PDF / Chaves NFCom')
+        self.tabs.addTab(xml_shell, 'Extrator de XML')
+        self.setCentralWidget(self.tabs)
 
     def load_json(self, name, default):
         try:
@@ -187,7 +195,8 @@ class MainWindow(QMainWindow):
         dl = QVBoxLayout(self.drop)
         dl.setContentsMargins(20, 18, 20, 18)
         icon = QLabel()
-        icon.setPixmap(QPixmap(str(ROOT / 'assets' / 'assti.png')).scaled(42, 42, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        if (ROOT / 'assets' / 'assti.png').is_file():
+            icon.setPixmap(QPixmap(str(ROOT / 'assets' / 'assti.png')).scaled(42, 42, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
         icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         dl.addWidget(icon)
         for text, name in [('Arraste seus arquivos XML aqui', 'subheading'), ('ou selecione os arquivos no computador', 'muted')]:
@@ -437,7 +446,7 @@ class MainWindow(QMainWindow):
         QMessageBox.warning(self, 'AssTI', message)
 
     def closeEvent(self, event):
-        if self.worker:
+        if self.worker or self.pdf_tab.worker:
             event.ignore()
             self.error('Aguarde o processamento terminar antes de fechar.')
         else:
